@@ -35,10 +35,26 @@ def setup_clean_db():
     Base.metadata.create_all(bind=TEST_ENGINE)
     db = TestingSessionLocal()
     try:
-        seed_initial_platform_data(db)
+        seed_initial_platform_data(db, fetch_live_jobs=False)
     finally:
         db.close()
     yield
+
+
+def _create_sample_eligible_job(suffix: str = "1") -> int:
+    resp = client.post(
+        "/api/jobs",
+        json={
+            "title": f"Junior SOC & Threat Intelligence Analyst {suffix}",
+            "employer_name": f"Cloudflare UK {suffix}",
+            "original_url": f"https://boards.greenhouse.io/cloudflare/jobs/{suffix}",
+            "country": "United Kingdom",
+            "location": "London, United Kingdom",
+            "description": "English-speaking SOC & Threat Intelligence role in London.",
+            "required_skills": ["Cybersecurity", "SOC Operations", "SIEM", "OSINT", "Python"],
+        },
+    )
+    return resp.json()["job"]["id"]
 
 
 client = TestClient(app)
@@ -229,8 +245,7 @@ def test_scenario_8_duplicate_vacancy_and_duplicate_submission_blocked():
 
 def test_scenario_9_unapproved_application_must_never_be_submitted():
     """9. Unapproved application — must never be submitted."""
-    jobs = client.get("/api/jobs?english_only=true").json()["jobs"]
-    job_id = jobs[0]["id"]
+    job_id = _create_sample_eligible_job("s9")
     app_id = client.post(f"/api/applications/prepare/{job_id}").json()["id"]
 
     sub_resp = client.post(f"/api/applications/{app_id}/submit").json()
@@ -240,8 +255,7 @@ def test_scenario_9_unapproved_application_must_never_be_submitted():
 
 def test_scenario_10_application_modified_after_approval_requires_fresh_approval():
     """10. Application modified after approval — must require fresh approval."""
-    jobs = client.get("/api/jobs?english_only=true").json()["jobs"]
-    job_id = jobs[0]["id"]
+    job_id = _create_sample_eligible_job("s10")
     app_id = client.post(f"/api/applications/prepare/{job_id}").json()["id"]
 
     approve_res = client.post(f"/api/applications/{app_id}/approve").json()
@@ -264,8 +278,7 @@ def test_scenario_10_application_modified_after_approval_requires_fresh_approval
 
 def test_scenario_11_captcha_encountered_pauses_for_human_intervention():
     """11. CAPTCHA encountered — automation must pause for human intervention."""
-    jobs = client.get("/api/jobs?english_only=true").json()["jobs"]
-    job_id = jobs[0]["id"]
+    job_id = _create_sample_eligible_job("s11")
     app_id = client.post(f"/api/applications/prepare/{job_id}").json()["id"]
     client.post(f"/api/applications/{app_id}/approve")
 
@@ -279,8 +292,7 @@ def test_scenario_11_captcha_encountered_pauses_for_human_intervention():
 
 def test_scenario_12_failed_submission_must_not_be_marked_successful():
     """12. Failed submission — must not be marked as successful."""
-    jobs = client.get("/api/jobs?english_only=true").json()["jobs"]
-    job_id = jobs[0]["id"]
+    job_id = _create_sample_eligible_job("s12")
     app_id = client.post(f"/api/applications/prepare/{job_id}").json()["id"]
     client.post(f"/api/applications/{app_id}/approve")
 
@@ -294,9 +306,8 @@ def test_scenario_12_failed_submission_must_not_be_marked_successful():
 
 def test_bulk_submission_engine_and_studios():
     """Tests CV tailoring, Cover Letter studio, Bulk Queue safeguards, Relocation, and Interview modules."""
-    jobs = client.get("/api/jobs?english_only=true").json()["jobs"]
-    job_1 = jobs[0]["id"]
-    job_2 = jobs[1]["id"]
+    job_1 = _create_sample_eligible_job("b1")
+    job_2 = _create_sample_eligible_job("b2")
 
     # Tailor CV & export PDF/DOCX
     cv_res = client.post(f"/api/cv/tailor/{job_1}").json()

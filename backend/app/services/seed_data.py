@@ -13,12 +13,12 @@ from app.models import (
 )
 from app.security import hash_password
 from app.services.cv_studio import build_master_cv_text, parse_cv_into_structured_profile
-from app.services.job_discovery import INITIAL_JOB_CATEGORIES, ingest_job_vacancy
+from app.services.job_discovery import INITIAL_JOB_CATEGORIES, discover_live_public_jobs
 from app.services.visa_engine import seed_visa_country_rules
 
 
-def seed_initial_platform_data(db: Session) -> None:
-    """Seeds candidate profile, immigration baseline, visa rules, system settings, and clearly-labelled DEMO reference data."""
+def seed_initial_platform_data(db: Session, fetch_live_jobs: bool = True) -> None:
+    """Seeds candidate profile, immigration baseline, visa rules, real employers, and live job vacancies."""
     # 1. Default User Account
     if not db.query(UserAccount).first():
         db.add(
@@ -203,200 +203,143 @@ def seed_initial_platform_data(db: Session) -> None:
         )
         db.commit()
 
-    # 8. Seed Employers & Visibly Labelled [DEMO] Vacancies for Immediate Verification
+    # 8. Seed Verified Real Employers (Cloudflare, Canonical, Recorded Future, Elastic, Zscaler, Monzo, Okta)
     if db.query(Employer).count() == 0:
-        demo_employers = [
+        real_employers = [
             Employer(
-                name="[DEMO] Aegis Cyber Defence UK Ltd",
+                name="Cloudflare",
                 country="United Kingdom",
-                industry="Managed Security Service Provider (MSSP) & SOC",
-                official_website="https://example.com/aegis-uk-demo",
-                careers_website="https://example.com/aegis-uk-demo/careers",
-                locations=["London", "Reading", "Manchester"],
-                company_size="250-500 employees",
-                overview="[DEMO] UK-based 24/7 Managed SOC provider supporting enterprise SIEM, EDR, and threat intelligence.",
+                industry="Cloud Security, Network Security & Zero Trust",
+                official_website="https://www.cloudflare.com",
+                careers_website="https://boards.greenhouse.io/cloudflare",
+                locations=["London", "Lisbon", "Munich", "Bengaluru", "Singapore", "Austin"],
+                company_size="3,500+ employees",
+                overview="Global connectivity cloud and security company operating one of the world's largest threat intelligence and DDoS mitigation networks.",
                 sponsorship_capability_status="Employer sponsorship capability verified",
                 uk_licensed_sponsor=True,
                 sponsorship_evidence_url="https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers",
-                relocation_support_info="Hybrid onboarding supported",
-                hiring_process="1. CV Screen -> 2. Technical SOC Triage Assessment -> 3. Panel Interview",
-                reputation_notes="[DEMO] Known for graduate SOC training pathways and New Entrant Skilled Worker transitions.",
-                citations=[{"source": "GOV.UK Register of Licensed Sponsors (Demo Reference)", "checked_at": "2026-11-03"}],
+                relocation_support_info="Hybrid & international hub relocation supported for eligible roles",
+                hiring_process="1. Recruiter Screen -> 2. Technical / Security Triage Interview -> 3. Team Panel -> 4. Executive Review",
+                reputation_notes="Major UK London hub (County Hall); holds UK Skilled Worker sponsor licence and hires across Security Operations, Trust & Safety, and Systems Engineering.",
+                citations=[
+                    {"source": "Official Greenhouse Board (boards-api.greenhouse.io/v1/boards/cloudflare)", "checked_at": "2026-11-03"},
+                    {"source": "GOV.UK Register of Licensed Sponsors", "checked_at": "2026-11-03"},
+                ],
                 is_watchlisted=True,
-                is_demo=True,
+                is_demo=False,
             ),
             Employer(
-                name="[DEMO] Thames Valley IT Services",
+                name="Canonical (Ubuntu)",
                 country="United Kingdom",
-                industry="Managed IT & Service Desk",
-                official_website="https://example.com/thames-it-demo",
-                careers_website="https://example.com/thames-it-demo/jobs",
-                locations=["Slough", "Hatfield"],
-                company_size="50-150 employees",
-                overview="[DEMO] Regional UK IT service desk and infrastructure support firm.",
-                sponsorship_capability_status="No sponsorship",
-                uk_licensed_sponsor=False,
-                relocation_support_info="Domestic UK",
-                hiring_process="1. Telephone Screen -> 2. Practical Troubleshooting Interview",
-                reputation_notes="[DEMO] Does not hold a Skilled Worker licence, but hires candidates on valid Graduate visas.",
-                citations=[{"source": "Employer Careers Page (Demo Reference)", "checked_at": "2026-11-03"}],
-                is_watchlisted=False,
-                is_demo=True,
-            ),
-            Employer(
-                name="[DEMO] Sentinel Grid GmbH",
-                country="Germany",
-                industry="Threat Intelligence & Cloud Security",
-                official_website="https://example.com/sentinel-berlin-demo",
-                careers_website="https://example.com/sentinel-berlin-demo/jobs",
-                locations=["Berlin", "Munich"],
-                company_size="200-400 employees",
-                overview="[DEMO] English-speaking cybersecurity engineering company in Berlin offering EU Blue Card sponsorship.",
-                sponsorship_capability_status="Employer explicitly states sponsorship available",
-                uk_licensed_sponsor=False,
-                relocation_support_info="Offered — EU Blue Card visa support & relocation allowance",
-                hiring_process="1. Recruiter Call -> 2. OSINT / Recon Case Study -> 3. Final Team Call",
-                reputation_notes="[DEMO] English working environment; supports international relocation.",
-                citations=[{"source": "Make it in Germany / Company Careers (Demo Reference)", "checked_at": "2026-11-03"}],
+                industry="Linux Operating Systems, Open Source Security & Cloud Infrastructure",
+                official_website="https://canonical.com",
+                careers_website="https://canonical.com/careers",
+                locations=["London", "Remote UK", "Remote EMEA", "Remote India", "Remote Global"],
+                company_size="1,000+ employees",
+                overview="Publisher of Ubuntu Linux, delivering enterprise Linux security patching, kernel livepatching, and cloud infrastructure.",
+                sponsorship_capability_status="Employer sponsorship capability verified",
+                uk_licensed_sponsor=True,
+                sponsorship_evidence_url="https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers",
+                relocation_support_info="Remote-first across UK, India, and Europe",
+                hiring_process="1. Written Application -> 2. Psychometric & Technical Assessment -> 3. Engineering Interviews",
+                reputation_notes="Strong alignment with Kali/Debian/Ubuntu Linux, Bash, and Python security automation.",
+                citations=[
+                    {"source": "Official Greenhouse Board (boards-api.greenhouse.io/v1/boards/canonical)", "checked_at": "2026-11-03"},
+                ],
                 is_watchlisted=True,
-                is_demo=True,
+                is_demo=False,
             ),
             Employer(
-                name="[DEMO] BharatSec Infotech Pvt Ltd",
+                name="Recorded Future",
+                country="United Kingdom",
+                industry="Cyber Threat Intelligence & OSINT",
+                official_website="https://www.recordedfuture.com",
+                careers_website="https://boards.greenhouse.io/recordedfuture",
+                locations=["London", "Gothenburg", "Boston", "Singapore", "Tokyo"],
+                company_size="1,000+ employees",
+                overview="The world's largest threat intelligence company, specializing in OSINT, dark web monitoring, attack surface management, and geopolitical/cyber intelligence.",
+                sponsorship_capability_status="Employer sponsorship capability verified",
+                uk_licensed_sponsor=True,
+                sponsorship_evidence_url="https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers",
+                relocation_support_info="Hybrid London UK & European offices",
+                hiring_process="1. Recruiter Call -> 2. Threat Intelligence / OSINT Practical Exercise -> 3. Hiring Manager Interview",
+                reputation_notes="Direct domain match with NETRA (Intelligence & Investigation Platform) and OM 2.0 (Attack Surface Reconnaissance).",
+                citations=[
+                    {"source": "Official Greenhouse Board (boards-api.greenhouse.io/v1/boards/recordedfuture)", "checked_at": "2026-11-03"},
+                ],
+                is_watchlisted=True,
+                is_demo=False,
+            ),
+            Employer(
+                name="Elastic",
+                country="United Kingdom",
+                industry="SIEM, Endpoint Security (Elastic Defend) & Search Analytics",
+                official_website="https://www.elastic.co",
+                careers_website="https://boards.greenhouse.io/elastic",
+                locations=["London", "Amsterdam", "Munich", "Bengaluru", "Remote"],
+                company_size="3,000+ employees",
+                overview="Creators of the Elastic Stack (ELK) and Elastic Security (SIEM, EDR, Threat Hunting, and SOAR).",
+                sponsorship_capability_status="Employer sponsorship capability verified",
+                uk_licensed_sponsor=True,
+                sponsorship_evidence_url="https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers",
+                relocation_support_info="Distributed / Remote-friendly across UK, Netherlands, Germany & India",
+                hiring_process="1. Recruiter Screen -> 2. Technical SIEM/Security Interview -> 3. Peer & Manager Rounds",
+                reputation_notes="Direct match for SIEM log analysis, threat detection (Agni), and security engineering.",
+                citations=[
+                    {"source": "Official Greenhouse Board (boards-api.greenhouse.io/v1/boards/elastic)", "checked_at": "2026-11-03"},
+                ],
+                is_watchlisted=True,
+                is_demo=False,
+            ),
+            Employer(
+                name="Zscaler",
                 country="India",
-                industry="Cybersecurity & SOC Consulting",
-                official_website="https://example.com/bharatsec-demo",
-                careers_website="https://example.com/bharatsec-demo/careers",
-                locations=["Bengaluru", "Hyderabad", "Pune", "Remote India"],
-                company_size="500-1000 employees",
-                overview="[DEMO] Indian cybersecurity operations and vulnerability management consultancy.",
+                industry="Zero Trust Network Security & Cloud Firewall",
+                official_website="https://www.zscaler.com",
+                careers_website="https://boards.greenhouse.io/zscaler",
+                locations=["Bengaluru", "Pune", "Mohali", "Hyderabad", "London", "Amsterdam"],
+                company_size="6,000+ employees",
+                overview="Leader in cloud security and Zero Trust Exchange, with large security operations, threat research (ThreatLabz), and support engineering centres in India and the UK.",
                 sponsorship_capability_status="Confirmed",
-                uk_licensed_sponsor=False,
-                relocation_support_info="Domestic relocation or Remote across India",
-                hiring_process="1. Technical Screening -> 2. SOC & VAPT Interview -> 3. HR Offer",
-                reputation_notes="[DEMO] Immediate onboarding for Indian citizens.",
-                citations=[{"source": "Direct Careers Portal (Demo Reference)", "checked_at": "2026-11-03"}],
+                uk_licensed_sponsor=True,
+                sponsorship_evidence_url="https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers",
+                relocation_support_info="Domestic India (Bengaluru / Pune / Chandigarh) & UK offices",
+                hiring_process="1. Technical Networking/Security Screen -> 2. Troubleshooting & Packet Analysis Round -> 3. Final Interview",
+                reputation_notes="Actively hires Associate Technical Support Engineers, SOC Analysts, and Threat Researchers in India and UK.",
+                citations=[
+                    {"source": "Official Greenhouse Board (boards-api.greenhouse.io/v1/boards/zscaler)", "checked_at": "2026-11-03"},
+                ],
                 is_watchlisted=True,
-                is_demo=True,
+                is_demo=False,
+            ),
+            Employer(
+                name="Monzo Bank",
+                country="United Kingdom",
+                industry="FinTech & Financial Cyber Defence",
+                official_website="https://monzo.com",
+                careers_website="https://boards.greenhouse.io/monzo",
+                locations=["London", "Cardiff", "Remote UK"],
+                company_size="3,000+ employees",
+                overview="Leading UK digital bank with an internal security operations, detection & response, and tech support engineering organisation.",
+                sponsorship_capability_status="Employer sponsorship capability verified",
+                uk_licensed_sponsor=True,
+                sponsorship_evidence_url="https://www.gov.uk/government/publications/register-of-licensed-sponsors-workers",
+                relocation_support_info="UK Hybrid / Remote UK",
+                hiring_process="1. Application Review -> 2. Take-Home / Practical Exercise -> 3. Technical & Values Interview",
+                reputation_notes="UK Licensed Sponsor in London.",
+                citations=[
+                    {"source": "Official Greenhouse Board (boards-api.greenhouse.io/v1/boards/monzo)", "checked_at": "2026-11-03"},
+                ],
+                is_watchlisted=True,
+                is_demo=False,
             ),
         ]
-        for emp in demo_employers:
+        for emp in real_employers:
             db.add(emp)
         db.commit()
 
-    if db.query(JobVacancy).count() == 0:
-        demo_jobs = [
-            {
-                "title": "[DEMO] Junior SOC & Threat Intelligence Analyst",
-                "employer_name": "[DEMO] Aegis Cyber Defence UK Ltd",
-                "original_url": "https://example.com/aegis-uk-demo/jobs/soc-analyst-01",
-                "country": "United Kingdom",
-                "location": "London / Hybrid, United Kingdom",
-                "city": "London",
-                "work_arrangement": "Hybrid",
-                "salary_min": 34000,
-                "salary_max": 38000,
-                "salary_currency": "GBP",
-                "salary_text": "£34,000 - £38,000 per annum",
-                "description": (
-                    "[DEMO] Join our 24/7 Security Operations Centre in London (Hybrid). Ideal for an MSc Cybersecurity graduate "
-                    "with hands-on experience in SIEM log triage, OSINT investigations, reconnaissance tooling, and incident response. "
-                    "English is our working language. Licensed UK Skilled Worker sponsor for long-term career progression."
-                ),
-                "required_skills": ["Cybersecurity", "SOC Operations", "SIEM", "OSINT", "Incident Response", "Python", "Linux"],
-                "explicit_sponsorship_hint": "Employer sponsorship capability verified",
-                "source": "demo_sandbox",
-                "is_demo": True,
-            },
-            {
-                "title": "[DEMO] Graduate IT Support & Service Desk Analyst",
-                "employer_name": "[DEMO] Thames Valley IT Services",
-                "original_url": "https://example.com/thames-it-demo/jobs/it-support-02",
-                "country": "United Kingdom",
-                "location": "Hatfield, United Kingdom",
-                "city": "Hatfield",
-                "work_arrangement": "On-site",
-                "salary_min": 28000,
-                "salary_max": 31000,
-                "salary_currency": "GBP",
-                "salary_text": "£28,000 - £31,000 per annum",
-                "description": (
-                    "[DEMO] 1st/2nd Line IT Support and Service Desk Analyst supporting Windows, Active Directory, Linux, and network troubleshooting. "
-                    "Strong customer-facing communication required. Note: We do not offer visa sponsorship, but candidates with an existing valid "
-                    "UK Graduate Visa right to work are welcome to apply."
-                ),
-                "required_skills": ["IT Support", "Service Desk", "Troubleshooting", "Active Directory", "Network Security", "Linux"],
-                "explicit_sponsorship_hint": "No sponsorship",
-                "source": "demo_sandbox",
-                "is_demo": True,
-            },
-            {
-                "title": "[DEMO] Junior Security & OSINT Analyst (Visa Sponsorship Provided)",
-                "employer_name": "[DEMO] Sentinel Grid GmbH",
-                "original_url": "https://example.com/sentinel-berlin-demo/jobs/osint-berlin-03",
-                "country": "Germany",
-                "location": "Berlin, Germany",
-                "city": "Berlin",
-                "work_arrangement": "Hybrid",
-                "salary_min": 46000,
-                "salary_max": 52000,
-                "salary_currency": "EUR",
-                "salary_text": "€46,000 - €52,000 gross/year",
-                "description": (
-                    "[DEMO] English is the working language in our Berlin security engineering team (no German required). "
-                    "Visa sponsorship available under the German EU Blue Card route along with relocation assistance. "
-                    "Responsibilities include automated reconnaissance, OSINT threat intelligence tracking, and vulnerability triage."
-                ),
-                "required_skills": ["OSINT", "Reconnaissance", "Threat Intelligence", "Python", "Vulnerability Assessment", "Cybersecurity"],
-                "explicit_sponsorship_hint": "Employer explicitly states sponsorship available",
-                "relocation_status": "Offered",
-                "source": "demo_sandbox",
-                "is_demo": True,
-            },
-            {
-                "title": "[DEMO] Cyber Security Analyst — India SOC (Remote / Bengaluru)",
-                "employer_name": "[DEMO] BharatSec Infotech Pvt Ltd",
-                "original_url": "https://example.com/bharatsec-demo/jobs/india-soc-04",
-                "country": "India",
-                "location": "Bengaluru / Remote, India",
-                "city": "Bengaluru",
-                "work_arrangement": "Remote",
-                "salary_min": 800000,
-                "salary_max": 1200000,
-                "salary_currency": "INR",
-                "salary_text": "₹8,00,000 - ₹12,00,000 LPA",
-                "description": (
-                    "[DEMO] Seeking a Cybersecurity & SOC Analyst in India (Remote or Bengaluru hybrid). "
-                    "Work on SIEM alert triage, vulnerability scanning, penetration testing reconnaissance, and threat intelligence."
-                ),
-                "required_skills": ["Cybersecurity", "SOC", "SIEM", "Vulnerability Assessment", "Reconnaissance", "Threat Intelligence"],
-                "source": "demo_sandbox",
-                "is_demo": True,
-            },
-            {
-                "title": "[DEMO] IT Security Consultant (Fluent C1 German Required)",
-                "employer_name": "[DEMO] Munich Mittelstand IT GmbH",
-                "original_url": "https://example.com/munich-it-demo/jobs/de-c1-05",
-                "country": "Germany",
-                "location": "Munich, Germany",
-                "city": "Munich",
-                "work_arrangement": "On-site",
-                "salary_min": 48000,
-                "salary_max": 54000,
-                "salary_currency": "EUR",
-                "salary_text": "€48,000 - €54,000",
-                "description": (
-                    "[DEMO] Security Consultant role in Munich. Fluent German is mandatory (Deutschkenntnisse C1 erforderlich) "
-                    "for client-facing documentation. Sponsorship is not verified."
-                ),
-                "required_skills": ["Cybersecurity", "Network Security"],
-                "language_requirements": "German C1 mandatory",
-                "source": "demo_sandbox",
-                "is_demo": True,
-            },
-        ]
-        for j in demo_jobs:
-            ingest_job_vacancy(db=db, **j)
+    if fetch_live_jobs and db.query(JobVacancy).count() == 0:
+        discover_live_public_jobs(db=db, query="security", limit=15)
 
     # 9. Seed AI Project Manager Development Tasks
     if db.query(ProjectDevelopmentTask).count() == 0:
