@@ -116,7 +116,8 @@ def build_master_cv_text(profile: CandidateProfile, imm: Optional[ImmigrationPro
     return (
         f"{profile.full_name}\n"
         f"{profile.headline}\n"
-        f"GitHub: {profile.github_url} | Website: {profile.website_url}\n"
+        f"Email: {profile.email or 'adizala7303@gmail.com'} | LinkedIn: {profile.linkedin_url or 'https://www.linkedin.com/in/adityarajsinh-zala'}\n"
+        f"GitHub: {profile.github_url} | Portfolio: {profile.website_url}\n"
         f"Work Eligibility: {uk_elig}\n\n"
         f"PROFESSIONAL SUMMARY\n"
         f"{profile.summary}\n\n"

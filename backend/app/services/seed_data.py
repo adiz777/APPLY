@@ -31,46 +31,47 @@ def seed_initial_platform_data(db: Session) -> None:
         )
         db.commit()
 
-    # 2. Candidate Profile (Verified initial context from prompt)
+    # 2. Candidate Profile (Verified from portfolio adizala.me, LinkedIn & GitHub adiz777)
     profile = db.query(CandidateProfile).first()
     if not profile:
         profile = CandidateProfile(
-            full_name="Adi Zala",
-            headline="MSc Cybersecurity Graduate | SOC Analyst, OSINT, Threat Intelligence & IT Support",
-            email=settings.apply_default_admin_email,
+            full_name="Adityarajsinh (Adi) Zala",
+            headline="MSc Cybersecurity Graduate | SOC Analyst, Threat Detection, OSINT & Reconnaissance",
+            email="adizala7303@gmail.com",
             phone="",
             github_url="https://github.com/adiz777",
             website_url="https://adizala.me",
-            linkedin_url="",
+            linkedin_url="https://www.linkedin.com/in/adityarajsinh-zala",
             summary=(
-                "MSc Cybersecurity graduate from the University of Hertfordshire (Completed September 2025) and BCA graduate "
-                "(Bhavan's Shree H. J. Doshi Institute, Saurashtra University, 2023). Experienced in building automated reconnaissance "
-                "and OSINT investigation platforms (Om, NETRA, and planned Agni threat detection system), paired with customer-facing "
-                "operational reliability at Travelodge UK."
+                "MSc Cybersecurity graduate from the University of Hertfordshire (2024–September 2025) and BCA graduate "
+                "from Bhavan's Shree H. J. Doshi Information Technology Institute, Saurashtra University (2020–2023). "
+                "Creator of open-source security platforms including OM 2.0 (Automated Reconnaissance & Intelligence Platform), "
+                "NETRA (Intelligence & Identity Investigation Workspace), and Agni (Cross-Platform Endpoint Defense & SOC Threat Detection), "
+                "paired with customer-facing operational reliability at Travelodge UK."
             ),
             education=[
                 {
                     "degree": "MSc Cybersecurity",
                     "institution": "University of Hertfordshire, United Kingdom",
-                    "completion_date": "September 2025",
+                    "completion_date": "2024 – September 2025",
                     "verified": True,
                 },
                 {
                     "degree": "Bachelor of Computer Applications (BCA)",
-                    "institution": "Bhavan's Shree H. J. Doshi Institute, Saurashtra University",
-                    "completion_date": "2023",
+                    "institution": "Bhavan's Shree H. J. Doshi Information Technology Institute, Saurashtra University",
+                    "completion_date": "2020 – 2023",
                     "verified": True,
                 },
             ],
             employment_history=[
                 {
                     "role": "Customer Operations & Hospitality Team Member",
-                    "employer": "Travelodge UK",
-                    "period": "Verify exact dates from uploaded CV",
+                    "employer": "Travelodge UK (Watford / United Kingdom)",
+                    "period": "UK Operations Experience",
                     "category": "Customer-Facing Hospitality & Operational Experience (Non-Cybersecurity)",
                     "responsibilities": (
                         "Delivered high-pressure customer-facing service, front-desk incident triage, shift handover reporting, "
-                        "and operational compliance. (Note: Accurately classified as customer/operational experience, never misrepresented as commercial cybersecurity tenure.)"
+                        "and operational compliance in the UK. (Strictly classified as customer/operational experience, never misrepresented as commercial cybersecurity tenure.)"
                     ),
                 }
             ],
@@ -80,13 +81,16 @@ def seed_initial_platform_data(db: Session) -> None:
                 "Security Analyst Triage",
                 "OSINT & Digital Investigations",
                 "Penetration Testing & Reconnaissance",
-                "Threat Intelligence",
+                "Threat Intelligence & Detection",
                 "Vulnerability Assessment",
                 "IT Support & Service Desk",
-                "Linux & Windows Administration",
-                "Network Troubleshooting (TCP/IP, DNS)",
-                "Python Security Scripting",
-                "SIEM Log Analysis",
+                "Kali Linux & Debian Administration",
+                "Windows & Active Directory",
+                "Network Security (Nmap, Wireshark, TCP/IP, DNS)",
+                "Web App Security (Burp Suite, SQLMap, WhatWeb, WafW00f)",
+                "Python, Bash, TypeScript & SQL",
+                "Docker & Cloudflare",
+                "SIEM Log Analysis & System Hardening",
             ],
             technical_interests=[
                 "Cybersecurity",
@@ -100,28 +104,38 @@ def seed_initial_platform_data(db: Session) -> None:
             ],
             projects=[
                 {
-                    "name": "Om — Automated Reconnaissance Tool",
-                    "status": "Completed / Active",
-                    "url": "https://github.com/adiz777",
-                    "description": "Automated security reconnaissance and attack-surface enumeration pipeline built for structured vulnerability and host discovery.",
+                    "name": "OM 2.0 — Automated Reconnaissance & Intelligence Platform",
+                    "status": "Active (Python, Bash, SQLite, 8-View Web Dashboard)",
+                    "url": "https://github.com/adiz777/Om",
+                    "description": (
+                        "Modular automated reconnaissance platform orchestrating 10 tools (Nmap, Amass, Sublist3r, WhatWeb, DNSRecon, "
+                        "WafW00f, SSLScan, theHarvester, Gobuster, CMSeeK) with strict scope validation, evidence-graded output normalization, "
+                        "SQLite scan history, session diffing, and HTML reporting."
+                    ),
                 },
                 {
-                    "name": "NETRA — Intelligence and Investigation Platform",
-                    "status": "Completed / Active",
-                    "url": "https://adizala.me",
-                    "description": "OSINT and digital investigation platform designed to correlate open-source indicators and streamline security investigations.",
+                    "name": "NETRA — Intelligence & Digital Investigation Platform",
+                    "status": "Active (TypeScript / Web Intelligence Workspace)",
+                    "url": "https://github.com/adiz777/NETRA",
+                    "description": (
+                        "Cybersecurity intelligence and digital investigation workspace supporting domain/IP intelligence, case management, "
+                        "timelines, relationship graphing, and structured investigation reports."
+                    ),
                 },
                 {
-                    "name": "Agni — Modular Threat Detection Project",
-                    "status": "Planned",
-                    "url": "https://github.com/adiz777",
-                    "description": "Planned modular threat detection and telemetry analysis framework.",
+                    "name": "Agni — Cross-Platform Endpoint Defense & SOC Threat Detection",
+                    "status": "Active / Developing (Python, React, TypeScript, Bash)",
+                    "url": "https://github.com/adiz777/Agni",
+                    "description": (
+                        "Local-first threat detection and endpoint security operations platform featuring Agni-Core, Vayu, and Varuna modules "
+                        "for real-time suspicious process/file monitoring and network anomaly detection."
+                    ),
                 },
             ],
             certifications=[],
             achievements=[
                 "Completed MSc Cybersecurity at University of Hertfordshire (September 2025)",
-                "Designed and published Om (Reconnaissance) and NETRA (OSINT Investigation) security engineering projects",
+                "Built and open-sourced OM 2.0, NETRA, and Agni across 220+ public repositories on GitHub (@adiz777)",
             ],
             languages=[{"language": "English", "proficiency": "Full Professional Working Proficiency"}],
             supporting_documents=[],
