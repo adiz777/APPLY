@@ -194,6 +194,14 @@ class BulkSubmissionRequest(BaseModel):
     selected_application_ids: Optional[list[int]] = None
 
 
+class BulkPrepareJobsRequest(BaseModel):
+    job_ids: list[int]
+
+
+class BulkApproveApplicationsRequest(BaseModel):
+    application_ids: list[int]
+
+
 class BulkControlRequest(BaseModel):
     action: str  # pause, resume, cancel
 
@@ -490,9 +498,18 @@ def list_jobs(
 ):
     query = db.query(JobVacancy)
     if country and country != "All":
-        query = query.filter(JobVacancy.country == country)
+        countries = [c.strip() for c in country.split(",") if c.strip() and c.strip() != "All"]
+        if len(countries) == 1:
+            query = query.filter(JobVacancy.country == countries[0])
+        elif len(countries) > 1:
+            query = query.filter(JobVacancy.country.in_(countries))
     if work_arrangement and work_arrangement != "All":
-        query = query.filter(JobVacancy.work_arrangement.ilike(f"%{work_arrangement}%"))
+        arrangements = [w.strip() for w in work_arrangement.split(",") if w.strip() and w.strip() != "All"]
+        if len(arrangements) == 1:
+            query = query.filter(JobVacancy.work_arrangement.ilike(f"%{arrangements[0]}%"))
+        elif len(arrangements) > 1:
+            from sqlalchemy import or_
+            query = query.filter(or_(*[JobVacancy.work_arrangement.ilike(f"%{w}%") for w in arrangements]))
     if sponsorship_status and sponsorship_status != "All":
         query = query.filter(JobVacancy.sponsorship_status == sponsorship_status)
     if english_only is True:
@@ -861,6 +878,35 @@ def prepare_application_endpoint(job_id: int, db: Session = Depends(get_db)):
         return {"id": app_rec.id, "stage": app_rec.stage, "human_approved": app_rec.human_approved}
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+
+
+@app.post("/api/applications/prepare-selected")
+def prepare_selected_applications_endpoint(req: BulkPrepareJobsRequest, db: Session = Depends(get_db)):
+    prepared = []
+    for jid in req.job_ids:
+        try:
+            app_rec = prepare_application_for_job(db, jid)
+            prepared.append({"id": app_rec.id, "job_id": jid, "stage": app_rec.stage})
+        except ValueError:
+            pass
+    return {
+        "prepared_count": len(prepared),
+        "skipped_existing_count": 0,
+        "application_ids": [p["id"] for p in prepared],
+        "prepared": prepared,
+    }
+
+
+@app.post("/api/applications/approve-selected")
+def approve_selected_applications_endpoint(req: BulkApproveApplicationsRequest, db: Session = Depends(get_db)):
+    approved = []
+    for aid in req.application_ids:
+        try:
+            app_rec = approve_application(db, aid)
+            approved.append({"id": app_rec.id, "stage": app_rec.stage, "approval_hash": app_rec.approval_hash})
+        except ValueError:
+            pass
+    return {"approved_count": len(approved), "approved": approved}
 
 
 @app.post("/api/applications/{app_id}/approve")

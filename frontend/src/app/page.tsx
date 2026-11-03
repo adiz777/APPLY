@@ -89,9 +89,11 @@ export default function ApplyCommandCentre() {
   const [pmData, setPmData] = useState<any>(null);
   const [settingsData, setSettingsData] = useState<any>(null);
 
-  // Filter & Form States
-  const [jobCountryFilter, setJobCountryFilter] = useState("All");
-  const [jobArrangementFilter, setJobArrangementFilter] = useState("All");
+  // Filter & Multi-Select States
+  const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
+  const [selectedArrangements, setSelectedArrangements] = useState<string[]>([]);
+  const [selectedJobIds, setSelectedJobIds] = useState<number[]>([]);
+  const [selectedAppIds, setSelectedAppIds] = useState<number[]>([]);
   const [jobEnglishOnly, setJobEnglishOnly] = useState(true);
   const [jobSearchQuery, setJobSearchQuery] = useState("");
   const [liveDiscoveryQuery, setLiveDiscoveryQuery] = useState("cybersecurity");
@@ -133,12 +135,14 @@ export default function ApplyCommandCentre() {
 
   const fetchAllCoreData = useCallback(async () => {
     try {
+      const countryParam = selectedCountries.length > 0 ? selectedCountries.join(",") : "All";
+      const arrangementParam = selectedArrangements.length > 0 ? selectedArrangements.join(",") : "All";
       const [ovRes, jobsRes, visaRes, profRes, cvRes, clRes, appRes, bulkRes, empRes, pmRes, setRes] =
         await Promise.all([
           fetch(`${API_BASE}/api/overview`).then((r) => r.json()),
           fetch(
-            `${API_BASE}/api/jobs?country=${encodeURIComponent(jobCountryFilter)}&work_arrangement=${encodeURIComponent(
-              jobArrangementFilter
+            `${API_BASE}/api/jobs?country=${encodeURIComponent(countryParam)}&work_arrangement=${encodeURIComponent(
+              arrangementParam
             )}&english_only=${jobEnglishOnly}&search=${encodeURIComponent(jobSearchQuery)}`
           ).then((r) => r.json()),
           fetch(`${API_BASE}/api/visa/countries`).then((r) => r.json()),
@@ -169,7 +173,7 @@ export default function ApplyCommandCentre() {
     } catch (err: any) {
       notify("error", `Backend connection warning: Ensure FastAPI server is running on ${API_BASE}`);
     }
-  }, [jobCountryFilter, jobArrangementFilter, jobEnglishOnly, jobSearchQuery, selectedJob]);
+  }, [selectedCountries, selectedArrangements, jobEnglishOnly, jobSearchQuery, selectedJob]);
 
   useEffect(() => {
     fetchAllCoreData();
@@ -293,9 +297,13 @@ export default function ApplyCommandCentre() {
     await fetchAllCoreData();
   };
 
-  const handleBulkSubmitApproved = async () => {
+  const handleBulkSubmitApproved = async (onlySelected: boolean = false) => {
     if (!bulkExplicitConfirm) {
       notify("error", "Please check the explicit final confirmation box before running bulk submission.");
+      return;
+    }
+    if (onlySelected && selectedAppIds.length === 0) {
+      notify("error", "Select at least one application checkbox to use Submit Selected.");
       return;
     }
     setLoading(true);
@@ -303,7 +311,10 @@ export default function ApplyCommandCentre() {
       const res = await fetch(`${API_BASE}/api/applications/bulk/submit-approved`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ explicit_final_confirmation: true }),
+        body: JSON.stringify({
+          explicit_final_confirmation: true,
+          selected_application_ids: onlySelected ? selectedAppIds : null,
+        }),
       }).then((r) => r.json());
       notify(
         "success",
@@ -315,6 +326,49 @@ export default function ApplyCommandCentre() {
       setLoading(false);
     }
   };
+
+  const handlePrepareSelectedJobs = async () => {
+    if (selectedJobIds.length === 0) {
+      notify("error", "Select one or more jobs first.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/applications/prepare-selected`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ job_ids: selectedJobIds }),
+      }).then((r) => r.json());
+      notify("success", `APPLYBOT prepared ${res.prepared_count} selected applications for human review!`);
+      setSelectedJobIds([]);
+      await fetchAllCoreData();
+      setActiveSection("Application Queue");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApproveSelectedApps = async () => {
+    if (selectedAppIds.length === 0) {
+      notify("error", "Select one or more applications first.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/applications/approve-selected`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ application_ids: selectedAppIds }),
+      }).then((r) => r.json());
+      notify("success", `Locked SHA-256 human approval for ${res.approved_count} selected applications!`);
+      await fetchAllCoreData();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleItemInList = <T,>(list: T[], item: T): T[] =>
+    list.includes(item) ? list.filter((x) => x !== item) : [...list, item];
 
   const handleQueueControl = async (action: "pause" | "resume" | "cancel") => {
     const res = await fetch(`${API_BASE}/api/applications/bulk/control`, {
@@ -670,79 +724,169 @@ export default function ApplyCommandCentre() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-2 border-t border-slate-800/80">
-                  <input
-                    type="text"
-                    value={jobSearchQuery}
-                    onChange={(e) => setJobSearchQuery(e.target.value)}
-                    placeholder="Filter by title, skill, employer..."
-                    className="px-3 py-1.5 rounded bg-[#050914] border border-slate-700 text-xs"
-                  />
-                  <select
-                    value={jobCountryFilter}
-                    onChange={(e) => setJobCountryFilter(e.target.value)}
-                    className="px-3 py-1.5 rounded bg-[#050914] border border-slate-700 text-xs"
-                  >
-                    <option value="All">All Countries</option>
-                    <option value="United Kingdom">United Kingdom</option>
-                    <option value="India">India</option>
-                    <option value="Germany">Germany</option>
-                    <option value="Ireland">Ireland</option>
-                    <option value="Netherlands">Netherlands</option>
-                    <option value="United Arab Emirates">United Arab Emirates</option>
-                    <option value="Canada">Canada</option>
-                    <option value="Australia">Australia</option>
-                    <option value="New Zealand">New Zealand</option>
-                  </select>
-                  <select
-                    value={jobArrangementFilter}
-                    onChange={(e) => setJobArrangementFilter(e.target.value)}
-                    className="px-3 py-1.5 rounded bg-[#050914] border border-slate-700 text-xs"
-                  >
-                    <option value="All">All Work Arrangements</option>
-                    <option value="Remote">Remote</option>
-                    <option value="Hybrid">Hybrid</option>
-                    <option value="On-site">On-site</option>
-                  </select>
-                  <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                <div className="space-y-3 pt-2 border-t border-slate-800/80">
+                  <div className="flex flex-wrap items-center gap-3">
                     <input
-                      type="checkbox"
-                      checked={jobEnglishOnly}
-                      onChange={(e) => setJobEnglishOnly(e.target.checked)}
-                      className="rounded border-slate-600"
+                      type="text"
+                      value={jobSearchQuery}
+                      onChange={(e) => setJobSearchQuery(e.target.value)}
+                      placeholder="Filter by title, skill, employer..."
+                      className="flex-1 min-w-[220px] px-3 py-1.5 rounded bg-[#050914] border border-slate-700 text-xs"
                     />
-                    English-Acceptable Roles Only
-                  </label>
+                    <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={jobEnglishOnly}
+                        onChange={(e) => setJobEnglishOnly(e.target.checked)}
+                        className="rounded border-slate-600"
+                      />
+                      English-Acceptable Roles Only
+                    </label>
+                  </div>
+
+                  {/* Multi-Select Country Filter Pills */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px] text-slate-400">
+                      <span className="font-mono uppercase text-sky-400">
+                        Multi-Select Countries ({selectedCountries.length === 0 ? "All" : selectedCountries.length + " selected"}):
+                      </span>
+                      {selectedCountries.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCountries([])}
+                          className="text-amber-300 hover:underline"
+                        >
+                          Reset Countries (Show All)
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        "United Kingdom",
+                        "India",
+                        "Germany",
+                        "Ireland",
+                        "Netherlands",
+                        "United Arab Emirates",
+                        "Canada",
+                        "Australia",
+                        "New Zealand",
+                        "Sweden",
+                        "United States",
+                      ].map((countryName) => {
+                        const active = selectedCountries.includes(countryName);
+                        return (
+                          <button
+                            key={countryName}
+                            type="button"
+                            onClick={() => setSelectedCountries(toggleItemInList(selectedCountries, countryName))}
+                            className={`px-2.5 py-1 rounded text-xs font-mono transition-all border ${
+                              active
+                                ? "bg-sky-500 text-slate-950 font-bold border-sky-400"
+                                : "bg-[#050914] text-slate-300 border-slate-800 hover:border-slate-600"
+                            }`}
+                          >
+                            {active ? "✓ " : "+ "}
+                            {countryName}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Multi-Select Work Arrangement Pills & Batch Job Toolbar */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-900">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[11px] font-mono uppercase text-slate-400 mr-1">Work Mode:</span>
+                      {["Remote", "Hybrid", "On-site"].map((mode) => {
+                        const active = selectedArrangements.includes(mode);
+                        return (
+                          <button
+                            key={mode}
+                            type="button"
+                            onClick={() => setSelectedArrangements(toggleItemInList(selectedArrangements, mode))}
+                            className={`px-2.5 py-1 rounded text-xs font-mono border ${
+                              active
+                                ? "bg-amber-400 text-slate-950 font-bold border-amber-300"
+                                : "bg-[#050914] text-slate-300 border-slate-800 hover:border-slate-600"
+                            }`}
+                          >
+                            {active ? "✓ " : "+ "}
+                            {mode}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedJobIds((jobsData.jobs || []).map((j: any) => j.id))}
+                        className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs"
+                      >
+                        Select All Visible ({jobsData.jobs?.length || 0})
+                      </button>
+                      {selectedJobIds.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedJobIds([])}
+                          className="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 text-xs"
+                        >
+                          Clear ({selectedJobIds.length})
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handlePrepareSelectedJobs}
+                        disabled={loading || selectedJobIds.length === 0}
+                        className="px-3 py-1 rounded bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-slate-950 font-bold text-xs"
+                      >
+                        Batch Prepare Selected Jobs ({selectedJobIds.length})
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* Discovered Vacancies List */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-3">
-                  {jobsData.jobs?.map((j: any) => (
+                  {jobsData.jobs?.map((j: any) => {
+                    const isSelected = selectedJobIds.includes(j.id);
+                    return (
                     <div
                       key={j.id}
-                      className="p-4 rounded-xl bg-[#0a0f1e] border border-slate-800 hover:border-sky-500/40 transition-all space-y-2.5"
+                      className={`p-4 rounded-xl bg-[#0a0f1e] border transition-all space-y-2.5 ${
+                        isSelected ? "border-sky-400 ring-1 ring-sky-400/30" : "border-slate-800 hover:border-sky-500/40"
+                      }`}
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {j.is_demo && (
-                              <span className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                                DEMO
+                        <div className="flex items-start gap-2.5">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => setSelectedJobIds(toggleItemInList(selectedJobIds, j.id))}
+                            className="mt-1 w-4 h-4 rounded border-slate-600 accent-sky-400 cursor-pointer"
+                          />
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {j.is_demo && (
+                                <span className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                                  DEMO
+                                </span>
+                              )}
+                              <h4 className="text-sm font-semibold text-white">{j.title}</h4>
+                              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-900 text-sky-300">
+                                {j.country}
                               </span>
-                            )}
-                            <h4 className="text-sm font-semibold text-white">{j.title}</h4>
-                            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-900 text-sky-300">
-                              {j.country}
-                            </span>
-                            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-300">
-                              {j.work_arrangement}
-                            </span>
+                              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-300">
+                                {j.work_arrangement}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                              {j.employer_name} • {j.location} • <span className="text-amber-300">{j.salary_text}</span>
+                            </p>
                           </div>
-                          <p className="text-xs text-slate-400 mt-0.5">
-                            {j.employer_name} • {j.location} • <span className="text-amber-300">{j.salary_text}</span>
-                          </p>
                         </div>
                         <div className="text-right shrink-0">
                           <span
@@ -795,7 +939,8 @@ export default function ApplyCommandCentre() {
                         </div>
                       </div>
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
 
                 {/* Ingest New Vacancy Form */}
@@ -1460,27 +1605,77 @@ export default function ApplyCommandCentre() {
                       onChange={(e) => setBulkExplicitConfirm(e.target.checked)}
                       className="rounded"
                     />
-                    I have reviewed all prepared answers, attached CVs/cover letters, and work eligibility declarations, and grant explicit final confirmation to submit all approved applications.
+                    I have reviewed all prepared answers, attached CVs/cover letters, and work eligibility declarations, and grant explicit final confirmation to submit approved applications.
                   </label>
-                  <button
-                    onClick={handleBulkSubmitApproved}
-                    disabled={loading}
-                    className="px-4 py-2 rounded bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-lg"
-                  >
-                    SUBMIT ALL APPROVED APPLICATIONS ({bulkSummary?.applications_ready_to_submit_count || 0})
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAppIds(applications.map((a: any) => a.id))}
+                      className="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs"
+                    >
+                      Select All ({applications.length})
+                    </button>
+                    {selectedAppIds.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedAppIds([])}
+                        className="px-2.5 py-1.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 text-xs"
+                      >
+                        Clear ({selectedAppIds.length})
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleApproveSelectedApps}
+                      disabled={loading || selectedAppIds.length === 0}
+                      className="px-3.5 py-1.5 rounded bg-sky-500 hover:bg-sky-400 disabled:opacity-40 text-slate-950 font-bold text-xs"
+                    >
+                      Approve Selected ({selectedAppIds.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleBulkSubmitApproved(true)}
+                      disabled={loading || selectedAppIds.length === 0}
+                      className="px-3.5 py-2 rounded bg-amber-400 hover:bg-amber-300 disabled:opacity-40 text-slate-950 font-bold text-xs shadow-lg"
+                    >
+                      SUBMIT SELECTED APPROVED ({selectedAppIds.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleBulkSubmitApproved(false)}
+                      disabled={loading}
+                      className="px-4 py-2 rounded bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-lg"
+                    >
+                      SUBMIT ALL APPROVED ({bulkSummary?.applications_ready_to_submit_count || 0})
+                    </button>
+                  </div>
                 </div>
               </div>
 
               {/* Individual Application Review & Approval Cards */}
               <div className="space-y-4">
-                {applications.map((app: any) => (
-                  <div key={app.id} className="p-4 rounded-xl bg-[#0a0f1e] border border-slate-800 space-y-3 text-xs">
+                {applications.map((app: any) => {
+                  const isAppSelected = selectedAppIds.includes(app.id);
+                  return (
+                  <div
+                    key={app.id}
+                    className={`p-4 rounded-xl bg-[#0a0f1e] border space-y-3 text-xs transition-all ${
+                      isAppSelected ? "border-sky-400 ring-1 ring-sky-400/30" : "border-slate-800"
+                    }`}
+                  >
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <span className="font-mono text-sky-400 mr-2">APP #{app.id}</span>
-                        <strong className="text-sm text-white">{app.job_title}</strong> —{" "}
-                        <span className="text-slate-300">{app.employer_name}</span> ({app.country})
+                      <div className="flex items-center gap-2.5">
+                        <input
+                          type="checkbox"
+                          checked={isAppSelected}
+                          onChange={() => setSelectedAppIds(toggleItemInList(selectedAppIds, app.id))}
+                          className="w-4 h-4 rounded border-slate-600 accent-sky-400 cursor-pointer"
+                        />
+                        <div>
+                          <span className="font-mono text-sky-400 mr-2">APP #{app.id}</span>
+                          <strong className="text-sm text-white">{app.job_title}</strong> —{" "}
+                          <span className="text-slate-300">{app.employer_name}</span> ({app.country})
+                        </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <span
@@ -1537,7 +1732,8 @@ export default function ApplyCommandCentre() {
                       </div>
                     </div>
                   </div>
-                ))}
+                );
+                })}
               </div>
             </div>
           )}

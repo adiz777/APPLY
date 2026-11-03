@@ -405,3 +405,31 @@ def test_reports_and_project_manager_inspection():
     assert pm["security_posture"]["human_approval_enforced"] is True
     assert len(pm["agents"]) == 9
 
+
+def test_multi_select_filtering_and_batch_actions():
+    """Tests multi-country / multi-arrangement filtering and batch prepare/approve/submit."""
+    job_a = _create_sample_eligible_job("ms_a")
+    job_b = _create_sample_eligible_job("ms_b")
+
+    # Multi-country filter
+    multi_jobs = client.get("/api/jobs?country=United%20Kingdom,India&work_arrangement=Hybrid,Remote,On-site").json()
+    assert multi_jobs["total"] >= 2
+
+    # Batch prepare selected jobs
+    prep_res = client.post("/api/applications/prepare-selected", json={"job_ids": [job_a, job_b]}).json()
+    assert prep_res["prepared_count"] == 2
+    app_ids = prep_res["application_ids"]
+    assert len(app_ids) == 2
+
+    # Batch approve selected applications
+    app_res = client.post("/api/applications/approve-selected", json={"application_ids": app_ids}).json()
+    assert app_res["approved_count"] == 2
+
+    # Submit only the first selected application
+    sub_res = client.post(
+        "/api/applications/bulk/submit-approved",
+        json={"explicit_final_confirmation": True, "selected_application_ids": [app_ids[0]]},
+    ).json()
+    assert sub_res["submitted_count"] == 1
+
+
